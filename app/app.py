@@ -2,36 +2,48 @@ import os
 import random
 from flask import Flask, jsonify, send_from_directory
 
-# 建立 Flask 應用程式
 app = Flask(__name__)
 
-# 定義圖片資料夾的絕對路徑
-# 這裡假設圖片資料夾 'images' 與 app.py 在同一個目錄下
 IMAGE_FOLDER = os.path.join(os.path.dirname(__file__), 'images')
 
 
-@app.route('/api/random-image', methods=['GET'])
-def get_random_image():
-    """
-    這個 API endpoint 會隨機回傳一張圖片。
-    """
+def get_random_image_path():
+    """從圖片資料夾中隨機選擇一個圖片檔案路徑。"""
     try:
-        # 獲取圖片資料夾中的所有檔案名稱
-        images = [f for f in os.listdir(IMAGE_FOLDER) if os.path.isfile(os.path.join(IMAGE_FOLDER, f))]
+        # 確保資料夾存在
+        full_path = os.path.join(app.root_path, IMAGE_FOLDER)
+        if not os.path.exists(full_path):
+            return None
+
+        # 定義圖片的副檔名清單
+        image_extensions = ('.jpg', '.jpeg', '.png', '.gif', '.svg', '.webp', '.bmp', '.tiff', '.jfif')
+
+        # 取得所有圖片檔案，並過濾掉非圖片檔案
+        images = [f for f in os.listdir(full_path)
+                  if os.path.isfile(os.path.join(full_path, f)) and f.lower().endswith(image_extensions)]
 
         if not images:
-            # 如果資料夾是空的，回傳錯誤訊息
-            return jsonify({"error": "No images found in the directory."}), 404
+            return None
 
-        # 從檔案列表中隨機選擇一個圖片
-        random_image_name = random.choice(images)
-
-        # 直接回傳圖片檔案
-        return send_from_directory(IMAGE_FOLDER, random_image_name)
+        # 隨機選擇一張圖片
+        random_image = random.choice(images)
+        return random_image
 
     except Exception as e:
-        # 處理任何可能發生的錯誤
-        return jsonify({"error": str(e)}), 500
+        print(f"Error getting random image: {e}")
+        return None
+
+
+@app.route('/api/random-image')
+def random_image_endpoint():
+    """回傳隨機圖片的 JSON 資料。"""
+    image_name = get_random_image_path()
+    if image_name:
+        # 將圖片檔案包裝成 URL 回傳
+        image_url = f"/api/images/{image_name}"
+        return jsonify({"image_url": image_url})
+    else:
+        return jsonify({"error": "No images found or an error occurred."}), 404
 
 
 @app.route('/images/<filename>')
